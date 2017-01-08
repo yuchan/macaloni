@@ -7,7 +7,6 @@ require 'json'
 class Macaloni < Thor
   desc "follow_followers", "follow your followers who tweets within the last 3 months."
   def follow_followers
-    t = twitter
     t.followers.each do |follower|
       user = t.user(follower.id)
       next if user.following?
@@ -23,7 +22,6 @@ class Macaloni < Thor
 
   desc "unfollow_friends", "unfollow your friends who don't tweets within the last 3 months."
   def unfollow_friends
-    t = twitter
     t.friends.each do |follower|
       user = t.user(follower.id)
       begin
@@ -38,7 +36,7 @@ class Macaloni < Thor
 
   private
 
-  def twitter
+  def t
     content = {}
     begin
       jsonstring = File.read("/tmp/macaloni.json")
