@@ -67,11 +67,9 @@ class Macaloni < Thor
   end
 
   def active(cli, user)
-    lasttweet = cli.user_timeline(user.id).first
-    return false if lasttweet.nil?
-    created_at = lasttweet.created_at    
+    return false if user.statuses_count == 0
     three_months_ago = Time.new.utc.to_datetime << 3
-    return false if created_at < three_months_ago.to_time
+    return false if user.status.created_at < three_months_ago.to_time
     true
   end
 end
