@@ -1,8 +1,10 @@
 # frozen_string_literal: true
-source "https://rubygems.org"
+source 'https://rubygems.org'
 
 # gem "rails"
-gem 'twitter'
+gem 'launchy'
 gem 'oauth'
 gem 'thor'
-gem 'launchy'
+gem 'twitter'
+
+gem 'rubocop', require: false
