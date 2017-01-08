@@ -11,14 +11,9 @@ class Macaloni < Thor
       user = t.user(follower.id)
       next if user.following?
       begin
-        created_at = t.user_timeline(follower.id).first.created_at
-        three_months_ago = Time.new.utc.to_datetime << 3
-        three_years_ago = Time.new.utc.to_datetime << 36
-        t.follow(follower.id) if created_at > three_months_ago.to_time
-        # t.unfollow(follower.id) if created_at < three_months_ago.to_time
-        # p created_at if created_at < three_years_ago.to_time
+        t.follow(follower.id) if active(t, user)
       rescue Twitter::Error::TooManyRequests
-        p 'rate limit'
+        raise
       rescue Twitter::Error::Unauthorized
         p 'this account might be private.'
       end
@@ -31,17 +26,9 @@ class Macaloni < Thor
     t.friends.each do |follower|
       user = t.user(follower.id)
       begin
-        lasttimeline = t.user_timeline(follower.id).first
-        if lasttimeline.nil?
-          t.unfollow(follower.id)
-        else
-          created_at = t.user_timeline(follower.id).first.created_at
-          three_months_ago = Time.new.utc.to_datetime << 3
-          three_years_ago = Time.new.utc.to_datetime << 36
-          t.unfollow(follower.id) if created_at < three_months_ago.to_time
-        end
+        t.unfollow(follower.id) unless active(t, user)
       rescue Twitter::Error::TooManyRequests
-        p 'rate limit'
+        raise
       rescue Twitter::Error::Unauthorized
         p 'this account might be private.'
       end
@@ -69,7 +56,6 @@ class Macaloni < Thor
     pin = $stdin.gets.chomp
 
     access_token = request_token.get_access_token(oauth_verifier: pin)
-    oauth_response = access_token.get('/1.1/account/verify_credentials.json?skip_status=true')
 
     cli = Twitter::REST::Client.new do |config|
       config.consumer_key        = access_token.consumer.key
@@ -78,6 +64,15 @@ class Macaloni < Thor
       config.access_token_secret = access_token.secret
     end
     cli
+  end
+
+  def active(cli, user)
+    lasttweet = cli.user_timeline(user.id).first
+    return false if lasttweet.nil?
+    created_at = lasttweet.created_at    
+    three_months_ago = Time.new.utc.to_datetime << 3
+    return false if created_at < three_months_ago.to_time
+    true
   end
 end
 
