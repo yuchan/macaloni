@@ -11,7 +11,7 @@ class Macaloni < Thor
       user = t.user(follower.id)
       next if user.following?
       begin
-        t.follow(follower.id) if active(t, user)
+        t.follow(follower.id) if active(user)
       rescue Twitter::Error::TooManyRequests
         raise
       rescue Twitter::Error::Unauthorized
@@ -25,7 +25,7 @@ class Macaloni < Thor
     t.friends.each do |follower|
       user = t.user(follower.id)
       begin
-        t.unfollow(follower.id) unless active(t, user)
+        t.unfollow(follower.id) unless active(user)
       rescue Twitter::Error::TooManyRequests
         raise
       rescue Twitter::Error::Unauthorized
@@ -37,46 +37,55 @@ class Macaloni < Thor
   private
 
   def t
-    content = {}
-    begin
-      jsonstring = File.read("/tmp/macaloni.json")
-      content = JSON.parse(jsonstring)
-    rescue
-      key        = ENV["TWITTER_CONSUMER_KEY"]
-      secret     = ENV["TWITTER_CONSUMER_SECRET"]
-
-      consumer = OAuth::Consumer.new(key, secret, site: Twitter::REST::Client::BASE_URL)      
-      request_token = consumer.get_request_token
-
-      request = consumer.create_signed_request(:get, consumer.authorize_path, request_token, {oauth_callback: 'oob'})
-      params = request['Authorization'].sub(/^OAuth\s+/, '').split(/,\s+/).collect do |param|
-        key, value = param.split('=')
-        value =~ /"(.*?)"/
-        "#{key}=#{CGI.escape(Regexp.last_match[1])}"
-      end.join('&')
-      uri = "#{Twitter::REST::Client::BASE_URL}#{request.path}?#{params}"
-      Launchy.open(uri)
-      puts 'Enter the PIN: '
-      pin = $stdin.gets.chomp
-      begin
-        access_token = request_token.get_access_token(oauth_verifier: pin)
-        config = {
-          consumer_key:         access_token.consumer.key,
-          consumer_secret:      access_token.consumer.secret,
-          access_token:         access_token.token,
-          access_token_secret:  access_token.secret      
-        } 
-        content = config.to_json
-        File.write("/tmp/macaloni.json", configjson)
-      rescue
-        raise
-      end
-    end
-    Twitter::REST::Client.new(content)
+    Twitter::REST::Client.new(config) unless config.nil?
   end
 
-  def active(cli, user)
-    return false if user.statuses_count == 0
+  def config
+    cf = config_from_file
+    cf = config_from_oauth if cf.nil?
+    File.write("/tmp/macaloni.json", cf.to_json)
+    cf
+  end
+
+  def config_from_file    
+    jsonstring = File.read("/tmp/macaloni.json") if File.exist?("/tmp/macaloni.json")
+    config = JSON.parse(jsonstring) unless jsonstring.nil?
+  end
+
+  def config_from_oauth
+    consumer = OAuth::Consumer.new(ENV["TWITTER_CONSUMER_KEY"], ENV["TWITTER_CONSUMER_SECRET"], site: Twitter::REST::Client::BASE_URL)      
+    request_token = consumer.get_request_token
+
+    request = consumer.create_signed_request(:get, consumer.authorize_path, request_token, {oauth_callback: 'oob'})
+    params = request['Authorization'].sub(/^OAuth\s+/, '').split(/,\s+/).collect do |param|
+      key, value = param.split('=')
+      value =~ /"(.*?)"/
+      "#{key}=#{CGI.escape(Regexp.last_match[1])}"
+    end.join('&')
+    uri = "#{Twitter::REST::Client::BASE_URL}#{request.path}?#{params}"
+    Launchy.open(uri)
+    pin = ask 'Enter the PIN: '
+    begin
+      access_token = request_token.get_access_token(oauth_verifier: pin)
+      config = {
+        consumer_key:         access_token.consumer.key,
+        consumer_secret:      access_token.consumer.secret,
+        access_token:         access_token.token,
+        access_token_secret:  access_token.secret      
+      }
+    rescue
+      nil
+    end
+  end
+
+  def ask(str)
+    puts str
+    puts '>> '
+    $stdin.gets.chomp
+  end
+
+  def active(user)
+    return false if user.statuses_count.zero?
     three_months_ago = Time.new.utc.to_datetime << 3
     return false if user.status.created_at < three_months_ago.to_time
     true
