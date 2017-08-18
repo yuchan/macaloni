@@ -61,6 +61,10 @@ module Macaloni
         return false if user.status.created_at < three_months_ago.to_time
         true
       end
+
+      def celebrity?(user)
+        t.friendship?(user, t.current_user) == false
+      end
     end
   end
 end

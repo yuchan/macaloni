@@ -33,31 +33,31 @@ module Macaloni
     desc "mute_friends", "mute friends who follows me."
     def mute_friends
       t.friends.each do |follower|
-        user = t.user(follower.id)
+        next if follower.muting?
         begin
-          t.mute(follower.id) if t.friendship?(follower, t.current_user)
+          t.mute(follower.id) unless celebrity?(follower)
         rescue Twitter::Error::TooManyRequests
           raise
         rescue Twitter::Error::Unauthorized
           p 'this account might be private.'
         end
-      end      
+      end
     end
 
     desc "unmute_friends", "mute friends who doesn't follows me."
     def unmute_friends
       t.friends.each do |follower|
-        user = t.user(follower.id)
+        next unless follower.muting?
         begin
-          t.unmute(follower.id) if t.friendship?(follower, t.current_user) == false and follower.muting? == true
+          t.unmute(follower.id) if celebrity?(follower)
         rescue Twitter::Error::TooManyRequests
           raise
         rescue Twitter::Error::Unauthorized
           p 'this account might be private.'
         end
-      end      
+      end
     end
-    
+
     private
 
     def _follow_followers(mute)
